@@ -29,11 +29,11 @@ public class PointsBoardSeasonHandler {
     @XxlJob("createPointsBoardSeasonTableJob")
     public void createPointsBoardSeason() {
         // 1. 获取当前日期
-        LocalDate time = LocalDate.now();
+        LocalDate now = LocalDate.now();
         // 2. 查询当前赛季榜单
         PointsBoardSeason currentSeason = pointsBoardSeasonService.lambdaQuery()
-                .le(PointsBoardSeason::getBeginTime, time) // created_time <= #{time}
-                .ge(PointsBoardSeason::getEndTime, time)   // end_time >= #{time}
+                .le(PointsBoardSeason::getBeginTime, now) // created_time <= #{time}
+                .ge(PointsBoardSeason::getEndTime, now)   // end_time >= #{time}
                 .one();
         if (currentSeason != null) {
             return; // 当前赛季榜单已经存在, 无需创建
@@ -53,8 +53,8 @@ public class PointsBoardSeasonHandler {
             season.setId(lastSeason.getId() + 1);
             season.setName("第" + season.getId() + "赛季");
         }
-        season.setBeginTime(DateUtils.getMonthBegin(time));
-        season.setEndTime(DateUtils.getMonthEnd(time));
+        season.setBeginTime(DateUtils.getMonthBegin(now));
+        season.setEndTime(DateUtils.getMonthEnd(now));
         pointsBoardSeasonService.save(season);
     }
 }
