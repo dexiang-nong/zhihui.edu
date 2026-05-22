@@ -2,4 +2,48 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.tianji.learning.mapper.PointsRecordMapper">
 
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.tianji.learning.domain.po.PointsRecord">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="type" property="type" />
+        <result column="points" property="points" />
+        <result column="create_time" property="createTime" />
+    </resultMap>
+    <insert id="createPointsRecordTableBySeason" parameterType="java.lang.String">
+        CREATE TABLE `${tableName}`
+        (
+            id          bigint auto_increment comment '积分记录表id',
+            user_id     bigint                             not null comment '用户id',
+            type        tinyint                            not null comment '积分方式：1-课程学习，2-每日签到，3-课程问答， 4-课程笔记，5-课程评价',
+            points      tinyint                            not null comment '积分值',
+            create_time datetime default CURRENT_TIMESTAMP not null comment '创建时间',
+            PRIMARY KEY (`id`) USING BTREE,
+            INDEX `idx_create_time` (`create_time`) USING BTREE,
+            INDEX `idx_user_id` (`user_id`, `type`) USING BTREE
+        )
+            COMMENT ='学习积分记录'
+            COLLATE = 'utf8mb4_0900_ai_ci'
+            ENGINE = InnoDB
+            ROW_FORMAT = DYNAMIC
+    </insert>
+
+    <!-- 查询今日获取的积分 -->
+    <select id="queryUserPointsByTypeAndDate" resultType="java.lang.Integer">
+        SELECT COALESCE(SUM(points), 0)
+        FROM points_record
+        WHERE user_id = #{userId}
+            AND type = #{type}
+            AND create_time BETWEEN #{beginTime} AND #{endTime}
+    </select>
+
+    <!-- 查询今日积分分类汇总 -->
+    <select id="queryTodayPoints" resultType="com.tianji.learning.domain.po.PointsRecord">
+        SELECT type, sum(points) AS points
+        FROM points_record
+        WHERE user_id = #{userId}
+          AND create_time BETWEEN #{beginTime} AND #{endTime}
+        GROUP BY type;
+    </select>
+
 </mapper>

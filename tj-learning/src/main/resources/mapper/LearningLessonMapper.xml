@@ -2,10 +2,20 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.tianji.learning.mapper.LearningLessonMapper">
 
-    <select id="queryTotalPlan" resultType="java.lang.Integer">
-        SELECT SUM(week_freq)
-        FROM learning_lesson
-        WHERE user_id = #{userId}
-        AND plan_status = 1 AND status IN (0, 1)
-    </select>
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.tianji.learning.domain.po.LearningLesson">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="course_id" property="courseId" />
+        <result column="status" property="status" />
+        <result column="week_freq" property="weekFreq" />
+        <result column="plan_status" property="planStatus" />
+        <result column="learned_sections" property="learnedSections" />
+        <result column="latest_section_id" property="latestSectionId" />
+        <result column="latest_learn_time" property="latestLearnTime" />
+        <result column="create_time" property="createTime" />
+        <result column="expire_time" property="expireTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
 </mapper>

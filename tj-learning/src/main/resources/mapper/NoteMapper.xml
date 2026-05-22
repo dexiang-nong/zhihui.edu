@@ -18,6 +18,7 @@
         AND (n.is_private = 0 OR n.user_id = #{userId})
         ORDER BY n.note_moment
     </select>
+
     <select id="queryNotePage" resultType="com.tianji.learning.domain.po.Note">
         SELECT n.id,
                n.user_id,
