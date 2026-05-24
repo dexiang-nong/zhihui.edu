@@ -98,6 +98,27 @@
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
         </dependency>
+
+        <!-- redis chat memory -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-starter-memory-redis</artifactId>
+            <version>${spring-ai-alibaba.version}</version>
+        </dependency>
+        <!-- jdbc chat memory (自实现, 修改表结构) -->
+<!--        <dependency>-->
+<!--            <groupId>org.springframework.ai</groupId>-->
+<!--            <artifactId>spring-ai-starter-model-chat-memory-repository-jdbc</artifactId>-->
+<!--        </dependency>-->
+        <!-- mongodb chat memory (自实现, 修改集合名) -->
+<!--        <dependency>-->
+<!--            <groupId>org.springframework.ai</groupId>-->
+<!--            <artifactId>spring-ai-starter-model-chat-memory-repository-mongodb</artifactId>-->
+<!--        </dependency>-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
