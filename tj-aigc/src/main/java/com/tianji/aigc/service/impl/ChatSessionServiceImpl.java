@@ -10,6 +10,7 @@ import com.tianji.aigc.domain.vo.MessageVO;
 import com.tianji.aigc.domain.vo.SessionVO;
 import com.tianji.aigc.enums.MessageTypeEnum;
 import com.tianji.aigc.mapper.ChatSessionMapper;
+import com.tianji.aigc.memory.MyAssistantMessage;
 import com.tianji.aigc.service.ChatService;
 import com.tianji.aigc.service.IChatSessionService;
 import com.tianji.common.utils.DateUtils;
@@ -70,6 +71,7 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
     
     @Override
     public List<MessageVO> queryBySessionId(String sessionId) {
+        // 拼接对话id: userId_sessionId
         String conversationId = ChatService.getConversationId(sessionId);
         
         List<Message> messageList = chatMemory.get(conversationId);
@@ -77,10 +79,20 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
                 // 过滤掉非用户消息和助手消息
                 .filter(message -> MessageType.ASSISTANT == message.getMessageType()  || MessageType.USER == message.getMessageType())
                 // 转换为MessageVO对象
-                .map(message -> MessageVO.builder()
-                        .content(message.getText())
-                        .type(MessageTypeEnum.valueOf(message.getMessageType().name()))
-                        .build())
+                .map(message -> {
+                    // 有params参数需要返回 (课程卡片信息)
+                    if (message instanceof MyAssistantMessage myAssistantMessage) {
+                        return MessageVO.builder()
+                                .content(message.getText())
+                                .type(MessageTypeEnum.valueOf(message.getMessageType().name()))
+                                .params(myAssistantMessage.getParams())
+                                .build();
+                    }
+                    return MessageVO.builder()
+                            .content(message.getText())
+                            .type(MessageTypeEnum.valueOf(message.getMessageType().name()))
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
     

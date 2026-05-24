@@ -3,6 +3,8 @@ package com.tianji.aigc.config;
 import com.alibaba.cloud.ai.memory.redis.LettuceRedisChatMemoryRepository;
 import com.tianji.aigc.memory.mongo.MongoChatMemoryRepository;
 import com.tianji.aigc.memory.mysql.JdbcChatMemoryRepository;
+import com.tianji.aigc.tools.CourseTool;
+import com.tianji.aigc.tools.OrderTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -35,7 +37,9 @@ public class SpringAIConfig {
             ChatModel chatModel,
             Advisor simpleLoggerAdvisor,
             Advisor messageChatMemoryAdvisor,
-            SystemPromptConfig systemPromptConfig
+            SystemPromptConfig systemPromptConfig,
+            CourseTool courseTool,
+            OrderTool orderTool
     ) {
         return ChatClient.builder(chatModel)
                 .defaultAdvisors(
@@ -46,6 +50,10 @@ public class SpringAIConfig {
                 .defaultSystem(promptSystemSpec -> promptSystemSpec
                         .text(systemPromptConfig.getChatSystemMessage().get())
                         .param("now", LocalDateTime.now()))
+                .defaultTools(
+                        courseTool, // 课程工具
+                        orderTool   // 订单工具
+                )
                 .build();
                 
     }

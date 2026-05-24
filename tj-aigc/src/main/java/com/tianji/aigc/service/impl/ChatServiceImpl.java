@@ -1,9 +1,15 @@
 package com.tianji.aigc.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.BooleanUtil;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
+import com.tianji.aigc.constants.ToolConstant;
 import com.tianji.aigc.domain.vo.ChatEventVO;
 import com.tianji.aigc.enums.ChatEventTypeEnum;
 import com.tianji.aigc.service.ChatService;
+import com.tianji.aigc.tools.config.ToolResultHolder;
+import com.tianji.common.utils.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -12,6 +18,8 @@ import org.springframework.data.redis.core.BoundSetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+
+import java.util.Map;
 
 /**
  * <p>
@@ -31,24 +39,35 @@ public class ChatServiceImpl implements ChatService {
     
     /*
         存储大模型的生成状态
-            1) 单机环境: 采用ConcurrentHashMap确保线程安全
-            2) 分布式环境: 采用第三方平台（如Redis）确保线程安全
+            1) 单机环境: 采用ConcurrentHashSet确保线程安全
+            2) 分布式环境: 采用第三方平台（如Redis:Set）确保线程安全
      */
     private final StringRedisTemplate redisTemplate;
     private static final String GENERATE_STATUS_KEY = "generate_status";
     
+    // 输出结束的标记
+    private static final ChatEventVO STOP_EVENT = ChatEventVO.builder()
+            .eventType(ChatEventTypeEnum.STOP.getValue())
+            .build();
+    
     @Override
     public Flux<ChatEventVO> chat(String question, String sessionId) {
+        // 拼接对话id: userId_sessionId
         String conversationId = ChatService.getConversationId(sessionId);
-        
+        // 存储AI生成内容
         StringBuilder outputBuilder = new StringBuilder();
-        
+        // 绑定redis:set
         BoundSetOperations<String, String> setOperations = redisTemplate.boundSetOps(GENERATE_STATUS_KEY);
+        // 工具上下文参数
+        String requestId = IdUtil.fastSimpleUUID();
+        Long userId = UserContext.getUser();
         
         return chatClient.prompt()
                 .user(question)
                 // 指定会话
                 .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                // 传递工具上下文参数
+                .toolContext(Map.of(ToolConstant.REQUEST_ID, requestId, ToolConstant.USER_ID, userId))
                 // 流式相应
                 .stream().chatResponse()
                 // 记录会话状态
@@ -61,8 +80,17 @@ public class ChatServiceImpl implements ChatService {
                         BooleanUtil.isTrue(setOperations.isMember(sessionId)))
                 // 格式化输出
                 .map(chatResponse -> {
-                    String text = chatResponse.getResult().getOutput().getText();
+                    /*
+                        如果是最后一条数据，将messageId存入内存中
+                        在存入数据库时，通过messageId取出params，一并存入数据库
+                     */
+                    String finishReason = chatResponse.getResult().getMetadata().getFinishReason();
+                    if (StrUtil.equals(ToolConstant.STOP, finishReason)) {
+                        String messageId = chatResponse.getMetadata().getId();
+                        ToolResultHolder.put(messageId, ToolConstant.REQUEST_ID, requestId);
+                    }
                     // 拼接AI生成内容
+                    String text = chatResponse.getResult().getOutput().getText();
                     outputBuilder.append(text);
                     // 封装VO对象输出
                     return ChatEventVO.builder()
@@ -70,60 +98,27 @@ public class ChatServiceImpl implements ChatService {
                             .eventType(ChatEventTypeEnum.DATA.getValue())
                             .build();
                 })
-                // 标记输出结束
-                .concatWith(Flux.just(ChatEventVO.builder()
-                        .eventType(ChatEventTypeEnum.STOP.getValue())
-                        .build()));
+                // 标记输出结束（判断是否携带参数：实现课程卡片）
+                .concatWith(Flux.defer(() -> {
+                    // 通过请求id获取到参数列表，如果不为空，就将其追加到返回结果中
+                    Map<String, Object> map = ToolResultHolder.get(requestId);
+                    if (CollUtil.isNotEmpty(map)) {
+                        ToolResultHolder.remove(requestId); // 清除参数列表
+                        // 响应给前端的参数数据
+                        ChatEventVO chatEventVO = ChatEventVO.builder()
+                                .eventData(map)
+                                .eventType(ChatEventTypeEnum.PARAM.getValue())
+                                .build();
+                        return Flux.just(chatEventVO, STOP_EVENT);
+                    }
+                    return Flux.just(STOP_EVENT);
+                }));
     }
     
     @Override
     public void stop(String sessionId) {
         redisTemplate.opsForSet().remove(GENERATE_STATUS_KEY, sessionId);
     }
-    
-//    private static final Set<String> GENERATE_STATUS = new ConcurrentHashSet<>();
-//
-//    @Override
-//    public Flux<ChatEventVO> chat(String question, String sessionId) {
-//        String conversationId = ChatService.getConversationId(sessionId);
-//
-//        StringBuilder outputBuilder = new StringBuilder();
-//
-//        return chatClient.prompt()
-//                .user(question)
-//                // 指定会话
-//                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
-//                // 流式相应
-//                .stream().chatResponse()
-//                // 记录会话状态
-//                .doFirst(() -> GENERATE_STATUS.add(sessionId))             // 初始，添加标识
-//                .doOnError(throwable -> GENERATE_STATUS.remove(sessionId)) // 异常，删除标识
-//                .doOnComplete(() -> GENERATE_STATUS.remove(sessionId))     // 完成，删除标识
-//                .doOnCancel(() -> // 当输出被取消时，将AI生成的内容存入到会话中
-//                        saveAIOutput(conversationId, outputBuilder.toString()))
-//                .takeWhile(response -> // 通过返回值控制Flux流是否继续
-//                        GENERATE_STATUS.contains(sessionId))
-//                // 格式化输出
-//                .map(chatResponse -> {
-//                    String text = chatResponse.getResult().getOutput().getText();
-//                    // 拼接AI生成内容
-//                    outputBuilder.append(text);
-//                    // 封装VO对象输出
-//                    return ChatEventVO.builder()
-//                            .eventData(text)
-//                            .eventType(ChatEventTypeEnum.DATA.getValue())
-//                            .build();
-//                })
-//                // 标记输出结束
-//                .concatWith(Flux.just(ChatEventVO.builder()
-//                        .eventType(ChatEventTypeEnum.STOP.getValue())
-//                        .build()));
-//    }
-//
-//    @Override
-//    public void stop(String sessionId) {
-//        GENERATE_STATUS.remove(sessionId); // 删除标识
-//    }
     
     private void saveAIOutput(String conversationId, String output) {
         chatMemory.add(conversationId, new AssistantMessage(output));
