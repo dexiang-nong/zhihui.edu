@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tianji.aigc.mapper.ChatRecordMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.tianji.aigc.domain.po.ChatRecord">
+        <id column="id" property="id" />
+        <result column="conversation_id" property="conversationId" />
+        <result column="data" property="data" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="creater" property="creater" />
+        <result column="updater" property="updater" />
+    </resultMap>
+
+</mapper>
