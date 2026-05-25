@@ -13,6 +13,9 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
@@ -37,14 +40,16 @@ public class SpringAIConfig {
             ChatModel chatModel,
             Advisor simpleLoggerAdvisor,
             Advisor messageChatMemoryAdvisor,
+            Advisor retrievalAugmentationAdvisor,
             SystemPromptConfig systemPromptConfig,
             CourseTool courseTool,
             OrderTool orderTool
     ) {
         return ChatClient.builder(chatModel)
                 .defaultAdvisors(
-                        simpleLoggerAdvisor,     // 日志记录
-                        messageChatMemoryAdvisor // 会话记录
+                        simpleLoggerAdvisor,         // 日志记录器
+                        messageChatMemoryAdvisor,    // 会话记录器
+                        retrievalAugmentationAdvisor // 向量数据库检索器
                 )
                 // 系统提示词 (手动从nacos上读取)
                 .defaultSystem(promptSystemSpec -> promptSystemSpec
@@ -103,6 +108,18 @@ public class SpringAIConfig {
     @Bean
     public ChatMemoryRepository mongodbChatMemoryRepository() {
         return new MongoChatMemoryRepository();
+    }
+    
+    @Bean
+    public Advisor retrievalAugmentationAdvisor(VectorStore vectorStore) {
+        return RetrievalAugmentationAdvisor.builder()
+                .documentRetriever(VectorStoreDocumentRetriever.builder()
+                        .vectorStore(vectorStore)
+                        .similarityThreshold(0.6d) // 相似度阈值
+                        .topK(6) // 返回最相似的6个文档
+                        .build()
+                )
+                .build();
     }
     
     @Bean

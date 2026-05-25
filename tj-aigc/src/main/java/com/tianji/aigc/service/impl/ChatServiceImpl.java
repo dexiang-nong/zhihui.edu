@@ -1,6 +1,7 @@
 package com.tianji.aigc.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
@@ -8,6 +9,7 @@ import com.tianji.aigc.constants.ToolConstant;
 import com.tianji.aigc.domain.vo.ChatEventVO;
 import com.tianji.aigc.enums.ChatEventTypeEnum;
 import com.tianji.aigc.service.ChatService;
+import com.tianji.aigc.service.IChatSessionService;
 import com.tianji.aigc.tools.config.ToolResultHolder;
 import com.tianji.common.utils.UserContext;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +52,8 @@ public class ChatServiceImpl implements ChatService {
             .eventType(ChatEventTypeEnum.STOP.getValue())
             .build();
     
+    private final IChatSessionService chatSessionService;
+    
     @Override
     public Flux<ChatEventVO> chat(String question, String sessionId) {
         // 拼接对话id: userId_sessionId
@@ -62,12 +66,19 @@ public class ChatServiceImpl implements ChatService {
         String requestId = IdUtil.fastSimpleUUID();
         Long userId = UserContext.getUser();
         
+        // 更新会话标题
+        String title = StrUtil.sub(question, 0, 100);
+        chatSessionService.asyncUpdateHistorySessionTitle(sessionId, title);
+        
         return chatClient.prompt()
                 .user(question)
                 // 指定会话
                 .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
                 // 传递工具上下文参数
-                .toolContext(Map.of(ToolConstant.REQUEST_ID, requestId, ToolConstant.USER_ID, userId))
+                .toolContext(MapUtil.<String, Object>builder()
+                        .put(ToolConstant.REQUEST_ID, requestId)
+                        .put(ToolConstant.USER_ID, userId)
+                        .build())
                 // 流式相应
                 .stream().chatResponse()
                 // 记录会话状态

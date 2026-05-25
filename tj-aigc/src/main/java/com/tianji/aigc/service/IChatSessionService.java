@@ -41,10 +41,15 @@ public interface IChatSessionService extends IService<ChatSession> {
     /**
      * 更新历史会话标题
      */
-    void putHistorySessionTitle(String sessionId, String title);
+    void updateHistorySessionTitle(String sessionId, String title);
     
     /**
      * 删除历史会话
      */
     void deleteHistorySession(String sessionId);
+    
+    /**
+     * 异步更新历史会话标题
+     */
+    void asyncUpdateHistorySessionTitle(String sessionId, String title);
 }

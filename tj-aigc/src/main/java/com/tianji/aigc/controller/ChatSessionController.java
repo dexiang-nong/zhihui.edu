@@ -54,13 +54,14 @@ public class ChatSessionController {
     
     @Operation(summary = "更新历史会话标题")
     @PutMapping("/history")
-    public void putHistorySessionTitle(String sessionId, String title) {
-        chatSessionService.putHistorySessionTitle(sessionId, title);
+    public void updateHistorySessionTitle(@RequestParam("sessionId") String sessionId,
+                                       @RequestParam("title") String title) {
+        chatSessionService.updateHistorySessionTitle(sessionId, title);
     }
     
     @Operation(summary = "删除历史会话")
     @DeleteMapping("/history")
-    public void deleteHistorySession(String sessionId) {
+    public void deleteHistorySession(@RequestParam("sessionId") String sessionId) {
         chatSessionService.deleteHistorySession(sessionId);
     }
 

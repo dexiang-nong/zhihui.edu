@@ -3,6 +3,7 @@ package com.tianji.aigc.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tianji.aigc.config.SessionProperties;
 import com.tianji.aigc.domain.po.ChatSession;
@@ -13,17 +14,18 @@ import com.tianji.aigc.mapper.ChatSessionMapper;
 import com.tianji.aigc.memory.MyAssistantMessage;
 import com.tianji.aigc.service.ChatService;
 import com.tianji.aigc.service.IChatSessionService;
-import com.tianji.common.utils.DateUtils;
+import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -98,48 +100,46 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
     
     @Override
     public Map<String, List<SessionVO>> queryHistorySession() {
-        // 查询用户所有会话列表
+        // 查询用户会话列表
         Long userId = UserContext.getUser();
         List<ChatSession> list = lambdaQuery()
                 .eq(ChatSession::getUserId, userId)
+                .isNotNull(ChatSession::getTitle)
                 .orderByDesc(ChatSession::getUpdateTime)
+                .last("LIMIT 30")
                 .list();
-        
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime dayStartTime = DateUtils.getDayStartTime(now); // 今天
-        LocalDateTime thirtyDaysAgo = dayStartTime.minusDays(30);    // 30天前
-        LocalDateTime oneYearAgo = dayStartTime.minusYears(1);       // 1年前
-        
-        Map<String, List<SessionVO>> result = new HashMap<>();
-        result.put("当天", new ArrayList<>());
-        result.put("最近30天", new ArrayList<>());
-        result.put("最近1年", new ArrayList<>());
-        result.put("1年以上", new ArrayList<>());
-        
-        for (ChatSession session : list) {
-            SessionVO sessionVO = SessionVO.builder()
-                    .sessionId(session.getSessionId())
-                    .title(session.getTitle())
-                    .updateTime(session.getUpdateTime())
-                    .build();
-            
-            LocalDateTime updateTime = session.getUpdateTime();
-            if (updateTime.isAfter(dayStartTime)) {
-                result.get("当天").add(sessionVO);
-            } else if (updateTime.isAfter(thirtyDaysAgo)) {
-                result.get("最近30天").add(sessionVO);
-            } else if (updateTime.isAfter(oneYearAgo)) {
-                result.get("最近1年").add(sessionVO);
-            } else {
-                result.get("1年以上").add(sessionVO);
-            }
+        if (CollUtils.isEmpty(list)) {
+            return Map.of();
         }
+        // 转换为响应VO
+        List<SessionVO> voList = list.stream()
+                .map(session -> SessionVO.builder()
+                        .sessionId(session.getSessionId())
+                        .title(session.getTitle())
+                        .updateTime(session.getUpdateTime())
+                        .build())
+                .toList();
         
-        return result;
+        // 根据时间分组
+        final var TODAY = "当天";
+        final var LAST_30_DAYS = "最近30天";
+        final var LAST_YEAR = "最近1年";
+        final var MORE_THAN_YEAR = "1年以上";
+        LocalDate today = LocalDateTime.now().toLocalDate();
+        return voList.stream()
+                .collect(Collectors.groupingBy(session -> {
+                    // 计算两个日期的天数差
+                    long day = ChronoUnit.DAYS.between(session.getUpdateTime().toLocalDate(), today);
+                    if (day == 0) return TODAY;
+                    if (day <= 30) return LAST_30_DAYS;
+                    if (day <= 365) return LAST_YEAR;
+                    return MORE_THAN_YEAR;
+                }));
     }
     
     @Override
-    public void putHistorySessionTitle(String sessionId, String title) {
+    public void updateHistorySessionTitle(String sessionId, String title) {
+        title = StrUtil.sub(title, 0, 100);
         lambdaUpdate()
                 .set(ChatSession::getTitle, title)
                 .eq(ChatSession::getSessionId, sessionId)
@@ -154,5 +154,21 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
                 .remove();
         // 删除会话记录
         chatMemory.clear(ChatService.getConversationId(sessionId));
+    }
+    
+    @Async // 异步更新，不影响AI响应
+    @Override
+    public void asyncUpdateHistorySessionTitle(String sessionId, String title) {
+        ChatSession session = lambdaQuery()
+                .eq(ChatSession::getSessionId, sessionId)
+                .one();
+        if (session == null) {
+            return;
+        }
+        if (StrUtil.isBlank(session.getTitle()) && StrUtil.isNotBlank(title)) {
+            session.setTitle(title);
+        }
+        session.setUpdateTime(LocalDateTime.now());
+        updateById(session);
     }
 }
