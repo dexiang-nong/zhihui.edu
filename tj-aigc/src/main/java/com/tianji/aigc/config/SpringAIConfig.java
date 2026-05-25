@@ -1,6 +1,8 @@
 package com.tianji.aigc.config;
 
 import com.alibaba.cloud.ai.memory.redis.LettuceRedisChatMemoryRepository;
+import com.tianji.aigc.advisor.RecordOptimizationAdvisor;
+import com.tianji.aigc.memory.MyChatMemoryRepository;
 import com.tianji.aigc.memory.mongo.MongoChatMemoryRepository;
 import com.tianji.aigc.memory.mysql.JdbcChatMemoryRepository;
 import com.tianji.aigc.tools.CourseTool;
@@ -35,8 +37,29 @@ import java.time.LocalDateTime;
 @Configuration
 public class SpringAIConfig {
     
+    /*
+        由【增强型智能体】改造为【路由工作流智能体】
+        对于增强方案，由AbstractAgent的子类实现对应方法指定需要的增强方案
+     */
     @Bean
-    public ChatClient chatClient(
+    public ChatClient routeChatClient(
+            ChatModel chatModel,
+            Advisor simpleLoggerAdvisor,
+            Advisor messageChatMemoryAdvisor,
+            Advisor recordOptimizationAdvisor
+    ) {
+        return ChatClient.builder(chatModel)
+                .defaultAdvisors(
+                        simpleLoggerAdvisor,      // 日志记录器
+                        messageChatMemoryAdvisor, // 会话记录器
+                        recordOptimizationAdvisor // 记录优化器
+                )
+                .build();
+    }
+    
+    // 【增强型智能体】
+    @Bean
+    public ChatClient baseChatClient(
             ChatModel chatModel,
             Advisor simpleLoggerAdvisor,
             Advisor messageChatMemoryAdvisor,
@@ -60,7 +83,6 @@ public class SpringAIConfig {
                         orderTool   // 订单工具
                 )
                 .build();
-                
     }
     
     @Bean
@@ -120,6 +142,11 @@ public class SpringAIConfig {
                         .build()
                 )
                 .build();
+    }
+    
+    @Bean
+    public Advisor recordOptimizationAdvisor(MyChatMemoryRepository myChatMemoryRepository) {
+        return new RecordOptimizationAdvisor(myChatMemoryRepository);
     }
     
     @Bean

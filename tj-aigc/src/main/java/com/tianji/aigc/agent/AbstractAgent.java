@@ -1,7 +1,6 @@
-package com.tianji.aigc.service.impl;
+package com.tianji.aigc.agent;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
@@ -11,78 +10,85 @@ import com.tianji.aigc.enums.ChatEventTypeEnum;
 import com.tianji.aigc.service.ChatService;
 import com.tianji.aigc.service.IChatSessionService;
 import com.tianji.aigc.tools.config.ToolResultHolder;
-import com.tianji.common.utils.UserContext;
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.Resource;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.BoundSetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.Map;
 
 /**
  * <p>
- * 聊天接口实现
+ * 路由工作流智能体【抽象类，包含公共逻辑】
  * </p>
  *
  * @author dexiang.nong
- * @since 2026-05-22
+ * @since 2026-05-25
  */
-@Service
-@RequiredArgsConstructor
-// 该服务存在两个智能体方案：【增强型智能体：ENHANCE】【路由工作流智能体：ROUTE】，只能使用一个，所以添加条件
-@ConditionalOnProperty(prefix = "tj.ai", value = "chat-type", havingValue = "ENHANCE")
-public class ChatServiceImpl implements ChatService {
+public abstract class AbstractAgent implements Agent {
     
-    private final ChatClient baseChatClient;
+    /*
+        根据ChatServiceImpl：增强型智能体改造
+     */
     
-    private final ChatMemory chatMemory;
+    @Resource
+    private ChatClient routeChatClient;
+    
+    @Resource
+    private ChatMemory chatMemory;
     
     /*
         存储大模型的生成状态
             1) 单机环境: 采用ConcurrentHashSet确保线程安全
             2) 分布式环境: 采用第三方平台（如Redis:Set）确保线程安全
      */
-    private final StringRedisTemplate redisTemplate;
+    // 因为是使用 @Resource 注入，所以名称不可以是 redisTemplate
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
     private static final String GENERATE_STATUS_KEY = "generate_status";
     
     // 输出结束的标记
-    private static final ChatEventVO STOP_EVENT = ChatEventVO.builder()
+    public static final ChatEventVO STOP_EVENT = ChatEventVO.builder()
             .eventType(ChatEventTypeEnum.STOP.getValue())
             .build();
     
-    private final IChatSessionService chatSessionService;
+    @Resource
+    private IChatSessionService chatSessionService;
     
     @Override
-    public Flux<ChatEventVO> chat(String question, String sessionId) {
+    public String process(String question, String sessionId) {
+        // 设置工具上下文参数
+        String requestId = IdUtil.fastSimpleUUID();
+        
+        // 更新会话标题、会话时间
+        String title = StrUtil.sub(question, 0, 100);
+        chatSessionService.asyncUpdateHistorySessionTitle(sessionId, title);
+        
+        // call() 阻塞调用
+        return getChatClientRequest(sessionId, requestId, question)
+                .call().content();
+    }
+    
+    @Override
+    public Flux<ChatEventVO> processStream(String question, String sessionId) {
         // 拼接对话id: userId_sessionId
         String conversationId = ChatService.getConversationId(sessionId);
         // 存储AI生成内容
         StringBuilder outputBuilder = new StringBuilder();
         // 绑定redis:set
-        BoundSetOperations<String, String> setOperations = redisTemplate.boundSetOps(GENERATE_STATUS_KEY);
+        BoundSetOperations<String, String> setOperations = stringRedisTemplate.boundSetOps(GENERATE_STATUS_KEY);
         // 工具上下文参数
         String requestId = IdUtil.fastSimpleUUID();
-        Long userId = UserContext.getUser();
         
-        // 更新会话标题
+        // 更新会话标题、会话时间
         String title = StrUtil.sub(question, 0, 100);
         chatSessionService.asyncUpdateHistorySessionTitle(sessionId, title);
         
-        return baseChatClient.prompt()
-                .user(question)
-                // 指定会话
-                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
-                // 传递工具上下文参数
-                .toolContext(MapUtil.<String, Object>builder()
-                        .put(ToolConstant.REQUEST_ID, requestId)
-                        .put(ToolConstant.USER_ID, userId)
-                        .build())
-                // 流式响应
+        // 流式响应
+        return getChatClientRequest(sessionId, requestId, question)
                 .stream().chatResponse()
                 // 记录会话状态
                 .doFirst(() -> setOperations.add(sessionId))             // 初始，添加标识
@@ -129,12 +135,37 @@ public class ChatServiceImpl implements ChatService {
                 }));
     }
     
-    @Override
-    public void stop(String sessionId) {
-        redisTemplate.opsForSet().remove(GENERATE_STATUS_KEY, sessionId);
+    private ChatClient.ChatClientRequestSpec getChatClientRequest(
+            String sessionId, String requestId, String question) {
+        return routeChatClient.prompt()
+                .user(question)
+                // 每个智能体会有自己的系统提示词
+                .system(promptSystemSpec -> promptSystemSpec
+                        .text(systemMessage())
+                        .params(systemMessageParams()))
+                // advisor需要在这里指定了，因为有的智能体不需要RAG增强
+                .advisors(advisor -> advisor
+                        .advisors(advisors())
+                        .params(advisorParams(sessionId, requestId)))
+                // tool也是，有的智能体不需要调用某个工具
+                .tools(tools())
+                // 工具上下文参数
+                .toolContext(toolContext(sessionId, requestId));
     }
     
     private void saveAIOutput(String conversationId, String output) {
         chatMemory.add(conversationId, new AssistantMessage(output));
     }
+    
+    @Override
+    public Map<String, Object> advisorParams(String sessionId, String requestId) {
+        var conversationId = ChatService.getConversationId(sessionId);
+        return Map.of(ChatMemory.CONVERSATION_ID, conversationId);
+    }
+    
+    @Override
+    public void stop(String sessionId) {
+        stringRedisTemplate.opsForSet().remove(GENERATE_STATUS_KEY, sessionId);
+    }
+    
 }

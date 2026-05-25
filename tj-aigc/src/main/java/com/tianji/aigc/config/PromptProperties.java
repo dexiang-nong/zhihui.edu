@@ -14,6 +14,11 @@ public class PromptProperties {
     @Data
     public static class System {
         private Chat chat; // 系统提示语，用于课程推荐、购买业务
+        private Chat routeWorkflowAgent; // 路由智能体系统提示词
+        private Chat recommendWorkflowAgent; // 推荐智能体系统提示词
+        private Chat buyWorkflowAgent; // 购买智能体系统提示词
+        private Chat consultWorkflowAgent; // 咨询智能体系统提示词
+        private Chat knowledgeWorkflowAgent; // 知识讲解智能体系统提示词
 
         @Data
         public static class Chat {

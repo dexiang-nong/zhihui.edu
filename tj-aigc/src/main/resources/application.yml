@@ -32,6 +32,17 @@ tj:
           data-id: system-prompt.txt
           group: DEFAULT_GROUP
           timeout-ms: 20000
+        route-workflow-agent:
+          data-id: route-workflow-agent-system-message.txt
+        recommend-workflow-agent:
+          data-id: recommend-workflow-agent-system-message.txt
+        buy-workflow-agent:
+          data-id: buy-workflow-agent-system-message.txt
+        consult-workflow-agent:
+          data-id: consult-workflow-agent-system-message.txt
+        knowledge-workflow-agent:
+          data-id: knowledge-workflow-agent-system-message.txt
+    chat-type: ROUTE # ROUTE / ENHANCE
     memory:
       max: 10
       type: mongodb # redis | mysql | mongodb
