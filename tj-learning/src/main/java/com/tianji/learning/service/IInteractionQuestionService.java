@@ -22,7 +22,7 @@ public interface IInteractionQuestionService extends IService<InteractionQuestio
     /**
      * 新增互动问题
      */
-    void addQuestion(QuestionFormDTO questionFormDTO);
+    InteractionQuestion addQuestion(QuestionFormDTO questionFormDTO);
     
     /**
      * 修改互动问题

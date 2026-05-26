@@ -27,6 +27,7 @@ public class SystemPromptConfig {
     private final AtomicReference<String> buyWorkflowAgentSystemMessage = new AtomicReference<>();
     private final AtomicReference<String> consultWorkflowAgentSystemMessage = new AtomicReference<>();
     private final AtomicReference<String> knowledgeWorkflowAgentSystemMessage = new AtomicReference<>();
+    private final AtomicReference<String> textSystemMessage = new AtomicReference<>();
 
     @PostConstruct // 初始化时加载配置
     public void init() {
@@ -37,6 +38,7 @@ public class SystemPromptConfig {
         loadConfig(promptProperties.getSystem().getBuyWorkflowAgent(), buyWorkflowAgentSystemMessage);
         loadConfig(promptProperties.getSystem().getConsultWorkflowAgent(), consultWorkflowAgentSystemMessage);
         loadConfig(promptProperties.getSystem().getKnowledgeWorkflowAgent(), knowledgeWorkflowAgentSystemMessage);
+        loadConfig(promptProperties.getSystem().getText(), textSystemMessage);
     }
 
     private void loadConfig(PromptProperties.System.Chat chatConfig, AtomicReference<String> target) {

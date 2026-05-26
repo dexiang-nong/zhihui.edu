@@ -9,6 +9,9 @@ spring:
     name: aigc-service
   main:
     allow-circular-references: true # 允许循环引用
+  servlet:
+    multipart:
+      max-file-size: 50MB
 tj:
   swagger:
     enable: true
@@ -42,6 +45,8 @@ tj:
           data-id: consult-workflow-agent-system-message.txt
         knowledge-workflow-agent:
           data-id: knowledge-workflow-agent-system-message.txt
+        text:
+          data-id: text-system-chat-message.txt
     chat-type: ROUTE # ROUTE / ENHANCE
     memory:
       max: 10

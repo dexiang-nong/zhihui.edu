@@ -15,12 +15,12 @@ import reactor.core.publisher.Flux;
 public interface ChatService {
     
     /**
-     * 聊天接口
+     * 聊天响应
      */
     Flux<ChatEventVO> chat(String question, String sessionId);
     
     /**
-     * 停止接口
+     * 停止响应
      */
     void stop(String sessionId);
     
@@ -28,4 +28,8 @@ public interface ChatService {
         return UserContext.getUser() + "_" + sessionId;
     }
     
+    /**
+     * 文本聊天
+     */
+    String chatText(String question);
 }

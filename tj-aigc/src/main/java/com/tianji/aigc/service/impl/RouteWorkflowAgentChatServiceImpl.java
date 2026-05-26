@@ -8,6 +8,7 @@ import com.tianji.aigc.enums.AgentTypeEnum;
 import com.tianji.aigc.enums.ChatEventTypeEnum;
 import com.tianji.aigc.service.ChatService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -73,6 +74,15 @@ public class RouteWorkflowAgentChatServiceImpl implements ChatService {
     @Override
     public void stop(String sessionId) {
         findAgentByType(AgentTypeEnum.ROUTE).stop(sessionId);
+    }
+    
+    private final ChatClient turboChatClient;
+    
+    @Override
+    public String chatText(String question) {
+        return turboChatClient.prompt()
+                .user(question)
+                .call().content();
     }
     
 }

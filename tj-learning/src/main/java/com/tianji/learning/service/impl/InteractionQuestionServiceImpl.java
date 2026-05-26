@@ -65,13 +65,15 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
      * 新增互动问题
      */
     @Override
-    public void addQuestion(QuestionFormDTO questionFormDTO) {
+    public InteractionQuestion addQuestion(QuestionFormDTO questionFormDTO) {
         // 1. 转换实体
         InteractionQuestion entity = BeanUtil.toBean(questionFormDTO, InteractionQuestion.class);
         // 2. 封装其他属性
         entity.setUserId(UserContext.getUser());
         // 3. 写道数据库
         save(entity);
+        
+        return entity;
     }
     
     /**

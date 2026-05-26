@@ -3,9 +3,11 @@ package com.tianji.learning.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
 import lombok.Data;
 
 @Data
+@Builder
 @Schema(description = "互动回答信息")
 public class ReplyDTO {
     

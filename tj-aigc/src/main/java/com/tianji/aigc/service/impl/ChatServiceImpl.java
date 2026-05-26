@@ -57,6 +57,8 @@ public class ChatServiceImpl implements ChatService {
     
     private final IChatSessionService chatSessionService;
     
+    private final ChatClient turboChatClient;
+    
     @Override
     public Flux<ChatEventVO> chat(String question, String sessionId) {
         // 拼接对话id: userId_sessionId
@@ -132,6 +134,13 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public void stop(String sessionId) {
         redisTemplate.opsForSet().remove(GENERATE_STATUS_KEY, sessionId);
+    }
+    
+    @Override
+    public String chatText(String question) {
+        return turboChatClient.prompt()
+                .user(question)
+                .call().content();
     }
     
     private void saveAIOutput(String conversationId, String output) {

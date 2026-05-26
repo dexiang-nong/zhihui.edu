@@ -1,6 +1,7 @@
 package com.tianji.learning.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.BooleanUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tianji.api.client.remark.RemarkClient;
@@ -77,8 +78,8 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
                     .eq(InteractionReply::getId, reply.getTargetReplyId())
                     .update();
         }
-        // 3. 判断是否是学生提交
-        if (replyDTO.getIsStudent()) {
+        // 3. 判断是否是学生提交（null 也是学生）
+        if (!BooleanUtil.isFalse(replyDTO.getIsStudent())) {
             // 标记问题状态为未查看
             questionService.lambdaUpdate()
                     .set(InteractionQuestion::getStatus, QuestionStatus.UN_CHECK)

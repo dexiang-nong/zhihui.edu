@@ -2,6 +2,7 @@ package com.tianji.aigc.controller;
 
 import com.tianji.aigc.domain.dto.ChatDTO;
 import com.tianji.aigc.domain.vo.ChatEventVO;
+import com.tianji.aigc.domain.vo.TemplateVO;
 import com.tianji.aigc.service.ChatService;
 import com.tianji.common.annotations.NoWrapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,8 @@ import reactor.core.publisher.Flux;
 public class ChatController {
 
     private final ChatService chatService;
+    
+    private static final TemplateVO TEMPLATE_VO = new TemplateVO();
 
     @Operation(summary = "聊天接口")
     @NoWrapper // 标记结果不进行包装
@@ -30,6 +33,18 @@ public class ChatController {
     @PostMapping("/stop")
     public void stop(@RequestParam("sessionId") String sessionId) {
         this.chatService.stop(sessionId);
+    }
+    
+    @Operation(summary = "文本聊天接口")
+    @PostMapping("/text")
+    public String chatText(@RequestBody String question) {
+        return chatService.chatText(question);
+    }
+    
+    @Operation(summary = "模板列表")
+    @GetMapping("/templates")
+    public TemplateVO getTemplates() {
+        return TEMPLATE_VO;
     }
     
 }
