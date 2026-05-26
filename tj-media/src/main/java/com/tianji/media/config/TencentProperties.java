@@ -28,6 +28,8 @@ public class TencentProperties {
     }
     @Data
     public static class CosProperties{
+        /*是否启用腾讯COS*/
+        private boolean enable;
         /*区域*/
         private String region;
         /*存储桶*/
