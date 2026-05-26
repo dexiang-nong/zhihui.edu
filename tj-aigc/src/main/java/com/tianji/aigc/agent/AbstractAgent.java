@@ -4,16 +4,23 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.tianji.aigc.constants.ToolConstant;
 import com.tianji.aigc.domain.vo.ChatEventVO;
 import com.tianji.aigc.enums.ChatEventTypeEnum;
+import com.tianji.aigc.memory.mongo.MongoChatRecord;
 import com.tianji.aigc.service.ChatService;
 import com.tianji.aigc.service.IChatSessionService;
 import com.tianji.aigc.tools.config.ToolResultHolder;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.redis.core.BoundSetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import reactor.core.publisher.Flux;
@@ -58,6 +65,15 @@ public abstract class AbstractAgent implements Agent {
     @Resource
     private IChatSessionService chatSessionService;
     
+    @Resource
+    private Advisor messageChatMemoryAdvisor;
+    
+    @Resource
+    private ChatMemoryRepository chatMemoryRepository;
+    
+    @Resource
+    private MongoTemplate mongoTemplate;
+    
     @Override
     public String process(String question, String sessionId) {
         // 设置工具上下文参数
@@ -68,6 +84,24 @@ public abstract class AbstractAgent implements Agent {
         chatSessionService.asyncUpdateHistorySessionTitle(sessionId, title);
         
         // call() 阻塞调用
+        // 1. 这里没有注入【会话记录器】，所以手动获取会话记录
+        String conversationId = ChatService.getConversationId(sessionId);
+//        List<Message> messages = chatMemoryRepository.findByConversationId(conversationId);
+//        if (CollUtil.isNotEmpty(messages)) {
+//            messages.add(new UserMessage(question));
+//            List<String> list = messages.stream()
+//                    .map(MessageUtil::toJson)
+//                    .toList();
+//            question = JSONUtil.toJsonStr(list);
+//        }
+        // findByConversationId 里面将json => Message, 上面又Message=>json；下面直接查询
+        Query query = Query.query(Criteria.where("conversationId").is(conversationId));
+        MongoChatRecord chatRecord = mongoTemplate.findOne(query, MongoChatRecord.class);
+        if (chatRecord != null) {
+            chatRecord.getMessages().add(question);
+            question = JSONUtil.toJsonStr(chatRecord.getMessages());
+        }
+        // 2. 将全部会话记录一起发送给大模型
         return getChatClientRequest(sessionId, requestId, question)
                 .call().content();
     }
@@ -89,6 +123,8 @@ public abstract class AbstractAgent implements Agent {
         
         // 流式响应
         return getChatClientRequest(sessionId, requestId, question)
+                // 独自添加会话记录器，这样就不用【记录优化器了】
+                .advisors(messageChatMemoryAdvisor)
                 .stream().chatResponse()
                 // 记录会话状态
                 .doFirst(() -> setOperations.add(sessionId))             // 初始，添加标识

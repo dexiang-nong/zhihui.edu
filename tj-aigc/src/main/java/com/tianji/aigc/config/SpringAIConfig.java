@@ -40,19 +40,23 @@ public class SpringAIConfig {
     /*
         由【增强型智能体】改造为【路由工作流智能体】
         对于增强方案，由AbstractAgent的子类实现对应方法指定需要的增强方案
+        
+        优化：
+            取消注册【会话记录器】，在 AbstractAgent#processStream 中独立注册
+            因为需要调用process和processStream，导致存储两份记录，需要记录优化器
      */
     @Bean
     public ChatClient routeChatClient(
             ChatModel chatModel,
-            Advisor simpleLoggerAdvisor,
-            Advisor messageChatMemoryAdvisor,
-            Advisor recordOptimizationAdvisor
+            Advisor simpleLoggerAdvisor
+//            Advisor messageChatMemoryAdvisor,
+//            Advisor recordOptimizationAdvisor
     ) {
         return ChatClient.builder(chatModel)
                 .defaultAdvisors(
-                        simpleLoggerAdvisor,      // 日志记录器
-                        messageChatMemoryAdvisor, // 会话记录器
-                        recordOptimizationAdvisor // 记录优化器
+                        simpleLoggerAdvisor      // 日志记录器
+//                        messageChatMemoryAdvisor, // 会话记录器
+//                        recordOptimizationAdvisor // 记录优化器
                 )
                 .build();
     }
