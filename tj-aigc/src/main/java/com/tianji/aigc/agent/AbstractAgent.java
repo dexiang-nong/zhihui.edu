@@ -10,13 +10,11 @@ import com.tianji.aigc.domain.vo.ChatEventVO;
 import com.tianji.aigc.enums.ChatEventTypeEnum;
 import com.tianji.aigc.memory.mongo.MongoChatRecord;
 import com.tianji.aigc.service.ChatService;
-import com.tianji.aigc.service.IChatSessionService;
 import com.tianji.aigc.tools.config.ToolResultHolder;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -63,13 +61,10 @@ public abstract class AbstractAgent implements Agent {
             .build();
     
     @Resource
-    private IChatSessionService chatSessionService;
-    
-    @Resource
     private Advisor messageChatMemoryAdvisor;
     
-    @Resource
-    private ChatMemoryRepository chatMemoryRepository;
+//    @Resource
+//    private ChatMemoryRepository chatMemoryRepository;
     
     @Resource
     private MongoTemplate mongoTemplate;
@@ -78,10 +73,6 @@ public abstract class AbstractAgent implements Agent {
     public String process(String question, String sessionId) {
         // 设置工具上下文参数
         String requestId = IdUtil.fastSimpleUUID();
-        
-        // 更新会话标题、会话时间
-        String title = StrUtil.sub(question, 0, 100);
-        chatSessionService.asyncUpdateHistorySessionTitle(sessionId, title);
         
         // call() 阻塞调用
         // 1. 这里没有注入【会话记录器】，所以手动获取会话记录
@@ -116,10 +107,6 @@ public abstract class AbstractAgent implements Agent {
         BoundSetOperations<String, String> setOperations = stringRedisTemplate.boundSetOps(GENERATE_STATUS_KEY);
         // 工具上下文参数
         String requestId = IdUtil.fastSimpleUUID();
-        
-        // 更新会话标题、会话时间
-        String title = StrUtil.sub(question, 0, 100);
-        chatSessionService.asyncUpdateHistorySessionTitle(sessionId, title);
         
         // 流式响应
         return getChatClientRequest(sessionId, requestId, question)

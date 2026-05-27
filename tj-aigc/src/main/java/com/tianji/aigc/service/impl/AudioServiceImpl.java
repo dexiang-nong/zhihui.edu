@@ -6,7 +6,7 @@ import com.tianji.aigc.service.AudioService;
 import com.tianji.media.storage.IFileStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.audio.tts.StreamingTextToSpeechModel;
+import org.springframework.ai.audio.tts.TextToSpeechModel;
 import org.springframework.ai.audio.tts.TextToSpeechPrompt;
 import org.springframework.ai.audio.tts.TextToSpeechResponse;
 import org.springframework.core.io.UrlResource;
@@ -22,7 +22,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class AudioServiceImpl implements AudioService {
     
-    private final StreamingTextToSpeechModel streamingTextToSpeechModel;
+    private final TextToSpeechModel textToSpeechModel;
     
     private final AudioTranscriptionModel audioTranscriptionModel;
     
@@ -33,7 +33,7 @@ public class AudioServiceImpl implements AudioService {
         log.info("开始语音合成, 文本内容：{}", text);
         ResponseBodyEmitter emitter = new ResponseBodyEmitter();
         TextToSpeechPrompt speechPrompt = new TextToSpeechPrompt(text);
-        Flux<TextToSpeechResponse> responseStream = streamingTextToSpeechModel.stream(speechPrompt);
+        Flux<TextToSpeechResponse> responseStream = textToSpeechModel.stream(speechPrompt);
         // 订阅响应流并发送数据
         responseStream.subscribe(
                 speechResponse -> {
