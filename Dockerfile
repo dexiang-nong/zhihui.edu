@@ -9,3 +9,4 @@ WORKDIR /app
 ADD app.jar /app/app.jar
 
 ENTRYPOINT ["sh","-c","java  -jar $JAVA_OPTS /app/app.jar"]
+
